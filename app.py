@@ -99,8 +99,7 @@ if user_prompt:
                     ]
 
                     payload = {
-                        "# NEW LINE 90:
-                           "model": "google/gemini-2.5-flash",
+                        "model": "google/gemini-2.5-flash",
                         "messages": api_messages,
                     }
 
