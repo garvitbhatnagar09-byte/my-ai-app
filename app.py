@@ -49,17 +49,38 @@ def search_web(query):
 
 def generate_free_image(prompt):
     encoded_prompt = urllib.parse.quote(prompt)
-    # Explicit dimensions and parameters force full Flux model rendering
     return f"https://image.pollinations.ai/prompt/{encoded_prompt}?model=flux&width=1024&height=1024&nologo=true"
 
 def encode_uploaded_image(file):
     return base64.b64encode(file.getvalue()).decode('utf-8')
 
+def extract_image_prompt(text):
+    """Detects if text is an image request and extracts the prompt."""
+    lowered = text.strip().lower()
+    
+    # Check for slash command
+    if lowered.startswith("/image"):
+        return text[6:].strip()
+    
+    # Check for common image creation phrasing
+    triggers = [
+        "generate an image of", "generate image of", 
+        "create an image of", "create image of",
+        "draw an image of", "draw image of",
+        "make an image of", "make image of"
+    ]
+    for trigger in triggers:
+        if trigger in lowered:
+            idx = lowered.find(trigger) + len(trigger)
+            return text[idx:].strip()
+            
+    return None
+
 # --- USER INPUT SECTION ---
 st.subheader("Message Input")
 
 # 1. Voice Input
-st.caption("🎙️ *Note: If microphone recording fails, allow microphone permissions in your browser.*")
+st.caption("🎙️ *Note: If microphone recording fails, allow microphone permissions in your browser settings.*")
 voice_text = speech_to_text(language='en', start_prompt="🎤 Click to Speak", stop_prompt="⏹️ Stop Recording", key='speech')
 
 # 2. File Upload
@@ -74,7 +95,7 @@ if uploaded_file is not None and uploaded_file.type.startswith("image/"):
         st.error(f"Error previewing image: {e}")
 
 # 3. Chat Text Input
-user_prompt = st.chat_input("Ask me anything, or type '/image <prompt>' to generate an image...")
+user_prompt = st.chat_input("Ask me anything, or type 'create an image of...' to generate image...")
 
 # Determine final prompt text
 final_prompt = user_prompt or voice_text
@@ -93,25 +114,26 @@ if final_prompt or uploaded_file:
         st.chat_message("user").markdown(final_prompt)
         st.session_state.messages.append({"role": "user", "content": final_prompt})
 
-    # 1. IMAGE GENERATION COMMAND TRIGGER
-    if prompt_text.lower().startswith("/image"):
-        img_prompt = prompt_text[6:].strip()
-        
-        if not img_prompt:
+    # Check for image generation intent
+    extracted_prompt = extract_image_prompt(prompt_text)
+
+    # 1. IMAGE GENERATION TRIGGER
+    if extracted_prompt is not None:
+        if not extracted_prompt:
             with st.chat_message("assistant"):
-                msg = "🎨 Please provide a descriptive prompt after `/image`. Example: `/image A full wooden cricket bat on grass`"
+                msg = "🎨 Please provide a descriptive prompt! Example: `create an image of a cricket bat on grass`"
                 st.markdown(msg)
                 st.session_state.messages.append({"role": "assistant", "content": msg})
         else:
             with st.chat_message("assistant"):
-                st.write(f"🎨 Generating image with Flux for: *{img_prompt}*")
+                st.write(f"🎨 Generating image for: *{extracted_prompt}*")
                 with st.spinner("Rendering high-quality image..."):
-                    img_url = generate_free_image(img_prompt)
-                    st.image(img_url, caption=f"Generated: {img_prompt}", use_container_width=True)
+                    img_url = generate_free_image(extracted_prompt)
+                    st.image(img_url, caption=f"Generated: {extracted_prompt}", use_container_width=True)
                     
                     st.session_state.messages.append({
                         "role": "assistant", 
-                        "content": f"![{img_prompt}]({img_url})\n\n[Open Full Size Image]({img_url})"
+                        "content": f"![{extracted_prompt}]({img_url})\n\n[Open Full Size Image]({img_url})"
                     })
 
     # 2. REGULAR AI / TEXT & VISION PROCESSING
@@ -129,7 +151,6 @@ if final_prompt or uploaded_file:
                 "- You are an AI assistant created and developed exclusively by Garvit Bhatnagar.\n"
                 "- If asked who created, developed, or built you, state explicitly: 'I was created and developed by Garvit Bhatnagar.'\n"
                 "- NEVER claim to be created by OpenAI, Meta, DeepSeek, Ant Group, Google, or any other corporation.\n"
-                "- DO NOT output raw code tags like <|tool_call_start|> or markdown syntax for tools.\n"
                 f"Current system date and time is {current_time}."
             )
 
