@@ -1,7 +1,6 @@
 import streamlit as st
 from openai import OpenAI
 from datetime import datetime
-from PIL import Image
 import urllib.parse
 from duckduckgo_search import DDGS
 from streamlit_mic_recorder import speech_to_text
@@ -52,6 +51,10 @@ def search_web(query):
         return f"Search error: {e}"
 
 def generate_pollinations_image(prompt, width=1024, height=1024, model="flux"):
+    """
+    Generates image URLs using Pollinations AI.
+    Defaults to 'flux' to prevent 402 INSUFFICIENT_BALANCE errors from paid models.
+    """
     encoded_prompt = urllib.parse.quote(prompt)
     return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model={model}&nologo=true"
 
@@ -133,7 +136,7 @@ if app_mode == "🤖 AI Chat Assistant":
 # MODE 2: TEXT-TO-IMAGE
 # ==============================================================================
 elif app_mode == "🎨 1. Text-to-Image Generator":
-    st.title("🎨 Text-to-Image Generation (Free)")
+    st.title("🎨 Text-to-Image Generation (100% Free)")
     
     prompt = st.text_area("Enter prompt describing the image you want:", "A detailed cricket bat standing upright on a wooden pitch, 8k resolution")
     
