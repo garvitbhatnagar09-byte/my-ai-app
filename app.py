@@ -43,6 +43,7 @@ if st.sidebar.button("🗑️ Clear Chat History"):
     st.rerun()
 
 # --- HELPER FUNCTIONS ---
+# --- HELPER FUNCTIONS ---
 def search_web(query):
     try:
         results = DDGS().text(query, max_results=3)
@@ -52,6 +53,11 @@ def search_web(query):
 
 def generate_pollinations_image(prompt, width=1024, height=1024, model="flux"):
     """
+    Generates image URLs using Pollinations AI.
+    Defaulting to 'flux' ensures free image generation without 402 balance errors.
+    """
+    encoded_prompt = urllib.parse.quote(prompt)
+    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model={model}&nologo=true"
     Generates image URLs using Pollinations AI.
     Defaults to 'flux' to prevent 402 INSUFFICIENT_BALANCE errors from paid models.
     """
