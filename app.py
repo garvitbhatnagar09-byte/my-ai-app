@@ -5,7 +5,9 @@ from PIL import Image
 from duckduckgo_search import DDGS
 from streamlit_mic_recorder import speech_to_text
 import urllib.parse
+import urllib.request
 import base64
+import io
 
 st.set_page_config(page_title="Garvit's AI Assistant", page_icon="🤖", layout="wide")
 
@@ -47,9 +49,13 @@ def search_web(query):
     except Exception as e:
         return f"Search error: {e}"
 
-def generate_free_image(prompt):
+def generate_and_fetch_image(prompt):
+    """Fetches image bytes directly to ensure reliable rendering in Streamlit."""
     encoded_prompt = urllib.parse.quote(prompt)
-    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?model=flux&width=1024&height=1024&nologo=true"
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?model=flux&width=1024&height=1024&nologo=true"
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req) as response:
+        return response.read(), url
 
 def encode_uploaded_image(file):
     return base64.b64encode(file.getvalue()).decode('utf-8')
@@ -58,11 +64,9 @@ def extract_image_prompt(text):
     """Detects if text is an image request and extracts the prompt."""
     lowered = text.strip().lower()
     
-    # Check for slash command
     if lowered.startswith("/image"):
         return text[6:].strip()
     
-    # Check for common image creation phrasing
     triggers = [
         "generate an image of", "generate image of", 
         "create an image of", "create image of",
@@ -97,24 +101,25 @@ if uploaded_file is not None and uploaded_file.type.startswith("image/"):
 # 3. Chat Text Input
 user_prompt = st.chat_input("Ask me anything, or type 'create an image of...' to generate image...")
 
-# Determine final prompt text
 final_prompt = user_prompt or voice_text
 
 # Render past chat history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        if message.get("type") == "image":
+            st.image(message["data"], caption=message["caption"], use_container_width=True)
+            st.markdown(f"[Open Full Size Image]({message['url']})")
+        else:
+            st.markdown(message["content"])
 
 # --- PROCESSING USER REQUEST ---
 if final_prompt or uploaded_file:
     prompt_text = final_prompt if final_prompt else "Describe and analyze this uploaded image."
 
-    # Render user message
     if final_prompt:
         st.chat_message("user").markdown(final_prompt)
         st.session_state.messages.append({"role": "user", "content": final_prompt})
 
-    # Check for image generation intent
     extracted_prompt = extract_image_prompt(prompt_text)
 
     # 1. IMAGE GENERATION TRIGGER
@@ -127,14 +132,21 @@ if final_prompt or uploaded_file:
         else:
             with st.chat_message("assistant"):
                 st.write(f"🎨 Generating image for: *{extracted_prompt}*")
-                with st.spinner("Rendering high-quality image..."):
-                    img_url = generate_free_image(extracted_prompt)
-                    st.image(img_url, caption=f"Generated: {extracted_prompt}", use_container_width=True)
-                    
-                    st.session_state.messages.append({
-                        "role": "assistant", 
-                        "content": f"![{extracted_prompt}]({img_url})\n\n[Open Full Size Image]({img_url})"
-                    })
+                with st.spinner("Rendering image..."):
+                    try:
+                        img_bytes, img_url = generate_and_fetch_image(extracted_prompt)
+                        st.image(img_bytes, caption=f"Generated: {extracted_prompt}", use_container_width=True)
+                        st.markdown(f"[Open Full Size Image]({img_url})")
+                        
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "type": "image",
+                            "data": img_bytes,
+                            "url": img_url,
+                            "caption": f"Generated: {extracted_prompt}"
+                        })
+                    except Exception as e:
+                        st.error(f"Failed to load generated image: {e}")
 
     # 2. REGULAR AI / TEXT & VISION PROCESSING
     else:
@@ -192,7 +204,8 @@ if final_prompt or uploaded_file:
             messages_payload = [{"role": "system", "content": system_instruction}]
             
             for m in st.session_state.messages[:-1]:
-                messages_payload.append({"role": m["role"], "content": m["content"]})
+                if m.get("type") != "image":
+                    messages_payload.append({"role": m["role"], "content": m["content"]})
 
             messages_payload.append({"role": "user", "content": user_content})
 
