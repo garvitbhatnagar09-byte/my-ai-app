@@ -1,0 +1,6 @@
+streamlit
+openai
+duckduckgo-search
+Pillow
+streamlit-mic-recorder
+youtube-transcript-api
