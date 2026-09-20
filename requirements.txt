@@ -4,3 +4,4 @@ duckduckgo-search
 youtube-transcript-api
 streamlit-mic-recorder
 Pillow
+requests
