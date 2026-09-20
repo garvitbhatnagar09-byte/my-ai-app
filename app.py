@@ -7,7 +7,7 @@ from streamlit_mic_recorder import speech_to_text
 import urllib.parse
 import base64
 
-st.set_page_config(page_title="Garvit's AI Assistant", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="JARVIS AI", page_icon="🤖", layout="wide")
 
 # --- SIDEBAR: Settings & Secrets ---
 st.sidebar.title("⚙️ Control Panel")
@@ -38,7 +38,7 @@ if st.sidebar.button("🗑️ Clear Chat History"):
     st.session_state.messages = []
     st.rerun()
 
-st.title("🤖 Garvit's AI Assistant")
+st.title("🤖 JARVIS AI Assistant")
 
 # --- HELPER FUNCTIONS ---
 def search_web(query):
@@ -93,7 +93,7 @@ if uploaded_file is not None and uploaded_file.type.startswith("image/"):
         st.error(f"Error previewing image: {e}")
 
 # 3. Chat Text Input
-user_prompt = st.chat_input("Ask me anything, or type 'create an image of...'")
+user_prompt = st.chat_input("Ask JARVIS anything, or type 'create an image of...'")
 
 final_prompt = user_prompt or voice_text
 
@@ -120,7 +120,7 @@ if final_prompt or uploaded_file:
     if extracted_prompt is not None and not uploaded_file:
         if not extracted_prompt:
             with st.chat_message("assistant"):
-                msg = "🎨 Please provide a descriptive prompt! Example: `create an image of a cricket bat on grass`"
+                msg = "🎨 Please provide a descriptive prompt! Example: `create an image of a futuristic city`"
                 st.markdown(msg)
                 st.session_state.messages.append({"role": "assistant", "content": msg})
         else:
@@ -150,8 +150,9 @@ if final_prompt or uploaded_file:
 
             system_instruction = (
                 "YOUR CORE IDENTITY:\n"
-                "- You are an AI assistant created and developed exclusively by Garvit Bhatnagar.\n"
-                "- If asked who created, developed, or built you, state explicitly: 'I was created and developed by Garvit Bhatnagar.'\n"
+                "- Your name is JARVIS.\n"
+                "- You are an advanced AI assistant created and developed exclusively by Garvit Bhatnagar.\n"
+                "- If asked who created, developed, or built you, state explicitly: 'I am JARVIS, created and developed by Garvit Bhatnagar.'\n"
                 "- NEVER claim to be created by OpenAI, Meta, DeepSeek, Google, or any other corporation.\n"
                 f"Current system date and time (IST) is {current_time}."
             )
@@ -201,7 +202,6 @@ if final_prompt or uploaded_file:
 
             messages_payload.append({"role": "user", "content": user_content})
 
-            # Route to explicit vision model if image attached, else default free router
             selected_model = "google/gemma-4-31b-it:free" if is_image_attached else "openrouter/free"
 
             with st.chat_message("assistant"):
