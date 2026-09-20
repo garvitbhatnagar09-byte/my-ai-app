@@ -45,12 +45,17 @@ st.title("🤖 All-in-One Free AI Assistant")
 
 
 # --- HELPER FUNCTIONS ---
-def search_web(query):
-  try:
-    results = DDGS().text(query, max_results=3)
-    return "\n".join([f"- {r['title']}: {r['body']}" for r in results])
-  except Exception as e:
-    return f"Search error: {e}"
+def generate_pollinations_image(prompt, width=1280, height=720):
+  seed = random.randint(1, 999999)
+  # Adding explicit photographic and spatial instructions
+  enhanced_prompt = (
+      f"full view studio product photo of {prompt}, entire object visible,"
+      " centered, no cropping, professional studio lighting, 8k quality"
+  )
+  encoded_prompt = urllib.parse.quote(enhanced_prompt)
+
+  # Using width=1280 & height=720 for a landscape aspect ratio
+  return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model=flux-realism&seed={seed}&nologo=true"
 
 
 def generate_pollinations_image(prompt, width=1024, height=1024):
