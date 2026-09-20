@@ -7,7 +7,7 @@ from streamlit_mic_recorder import speech_to_text
 import urllib.parse
 import base64
 
-st.set_page_config(page_title="JARVIS", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Garvit's AI Assistant", page_icon="🤖", layout="wide")
 
 # --- SIDEBAR: Settings & Secrets ---
 st.sidebar.title("⚙️ Control Panel")
