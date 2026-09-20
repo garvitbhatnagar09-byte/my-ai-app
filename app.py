@@ -1,13 +1,11 @@
 import streamlit as st
 from openai import OpenAI
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from PIL import Image
 from duckduckgo_search import DDGS
 from streamlit_mic_recorder import speech_to_text
 import urllib.parse
-import urllib.request
 import base64
-import io
 
 st.set_page_config(page_title="Garvit's AI Assistant", page_icon="🤖", layout="wide")
 
@@ -24,9 +22,10 @@ elif "OPENROUTER_API_KEY" in st.secrets:
 else:
     api_key = None
 
-# Display System Time
-current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-st.sidebar.write(f"📅 **Current Time:** {current_time}")
+# Display India Standard Time (UTC + 5:30)
+ist_timezone = timezone(timedelta(hours=5, minutes=30))
+current_time = datetime.now(ist_timezone).strftime("%Y-%m-%d %H:%M:%S")
+st.sidebar.write(f"📅 **Current Time (IST):** {current_time}")
 
 # Feature Selection
 enable_web_search = st.sidebar.checkbox("🌐 Enable Web Search (DuckDuckGo)")
@@ -49,13 +48,10 @@ def search_web(query):
     except Exception as e:
         return f"Search error: {e}"
 
-def generate_and_fetch_image(prompt):
-    """Fetches image bytes directly to ensure reliable rendering in Streamlit."""
+def generate_image_url(prompt):
+    """Generates a clean image URL using Pollinations API."""
     encoded_prompt = urllib.parse.quote(prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?model=flux&width=1024&height=1024&nologo=true"
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-    with urllib.request.urlopen(req) as response:
-        return response.read(), url
+    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
 
 def encode_uploaded_image(file):
     return base64.b64encode(file.getvalue()).decode('utf-8')
@@ -107,8 +103,8 @@ final_prompt = user_prompt or voice_text
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         if message.get("type") == "image":
-            st.image(message["data"], caption=message["caption"], use_container_width=True)
-            st.markdown(f"[Open Full Size Image]({message['url']})")
+            st.image(message["url"], caption=message["caption"], use_container_width=True)
+            st.markdown(f"[🔗 Open Full Size Image]({message['url']})")
         else:
             st.markdown(message["content"])
 
@@ -133,20 +129,16 @@ if final_prompt or uploaded_file:
             with st.chat_message("assistant"):
                 st.write(f"🎨 Generating image for: *{extracted_prompt}*")
                 with st.spinner("Rendering image..."):
-                    try:
-                        img_bytes, img_url = generate_and_fetch_image(extracted_prompt)
-                        st.image(img_bytes, caption=f"Generated: {extracted_prompt}", use_container_width=True)
-                        st.markdown(f"[Open Full Size Image]({img_url})")
-                        
-                        st.session_state.messages.append({
-                            "role": "assistant",
-                            "type": "image",
-                            "data": img_bytes,
-                            "url": img_url,
-                            "caption": f"Generated: {extracted_prompt}"
-                        })
-                    except Exception as e:
-                        st.error(f"Failed to load generated image: {e}")
+                    img_url = generate_image_url(extracted_prompt)
+                    st.image(img_url, caption=f"Generated: {extracted_prompt}", use_container_width=True)
+                    st.markdown(f"[🔗 Open Full Size Image]({img_url})")
+                    
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "type": "image",
+                        "url": img_url,
+                        "caption": f"Generated: {extracted_prompt}"
+                    })
 
     # 2. REGULAR AI / TEXT & VISION PROCESSING
     else:
@@ -163,7 +155,7 @@ if final_prompt or uploaded_file:
                 "- You are an AI assistant created and developed exclusively by Garvit Bhatnagar.\n"
                 "- If asked who created, developed, or built you, state explicitly: 'I was created and developed by Garvit Bhatnagar.'\n"
                 "- NEVER claim to be created by OpenAI, Meta, DeepSeek, Ant Group, Google, or any other corporation.\n"
-                f"Current system date and time is {current_time}."
+                f"Current system date and time (IST) is {current_time}."
             )
 
             if enable_web_search and final_prompt:
