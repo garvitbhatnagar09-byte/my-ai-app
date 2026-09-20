@@ -1,201 +1,126 @@
-import streamlit as st
-from openai import OpenAI
-from datetime import datetime
 import urllib.parse
-from duckduckgo_search import DDGS
-from streamlit_mic_recorder import speech_to_text
+import requests
+import streamlit as st
 
-# Page Configuration
-st.set_page_config(page_title="Garvit's AI Assistant & Image Studio", page_icon="🤖", layout="wide")
-
-# --- SIDEBAR: Settings & Configuration ---
-st.sidebar.title("⚙️ Control Panel")
-
-# OpenRouter Key Handling
-api_key_input = st.sidebar.text_input("Enter OpenRouter API Key (Optional if set in Secrets)", type="password")
-
-if api_key_input:
-    api_key = api_key_input
-elif "OPENROUTER_API_KEY" in st.secrets:
-    api_key = st.secrets["OPENROUTER_API_KEY"]
-else:
-    api_key = None
-
-# Time Display
-current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-st.sidebar.write(f"📅 **Current Time:** {current_time}")
-
-# Web Search Checkbox
-enable_web_search = st.sidebar.checkbox("🌐 Enable Web Search (DuckDuckGo)")
-
-# Mode Selector
-app_mode = st.sidebar.selectbox(
-    "Choose Mode:",
-    ["🤖 AI Chat Assistant", "🎨 1. Text-to-Image Generator", "🖼️ 2. Image-to-Image Generator", "🪄 3. Image Editing / Inpainting"]
+# Set page configuration
+st.set_page_config(
+    page_title="My Conversational AI", page_icon="🤖", layout="wide"
 )
 
-# Chat History Reset
+# App Title
+st.title("🤖 My Conversational AI")
+
+# Sidebar for API Key input
+st.sidebar.header("Configuration")
+api_key_input = st.sidebar.text_input("Enter OpenRouter API Key", type="password")
+
+# API Key Resolution Strategy
+api_key = api_key_input
+if not api_key and "OPENROUTER_API_KEY" in st.secrets:
+    api_key = st.secrets["OPENROUTER_API_KEY"]
+
+if not api_key:
+    st.info("Please enter your OpenRouter API Key in the sidebar to start chatting.")
+    st.stop()
+
+# Initialize Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if st.sidebar.button("🗑️ Clear Chat History"):
-    st.session_state.messages = []
-    st.rerun()
-
-# --- HELPER FUNCTIONS ---
-# --- HELPER FUNCTIONS ---
-def search_web(query):
-    try:
-        results = DDGS().text(query, max_results=3)
-        return "\n".join([f"- {r['title']}: {r['body']}" for r in results])
-    except Exception as e:
-        return f"Search error: {e}"
 
 def generate_pollinations_image(prompt, width=1024, height=1024, model="flux"):
     """
-    Generates image URLs using Pollinations AI.
-    Defaulting to 'flux' ensures free image generation without 402 balance errors.
+    Automatically enhances short user prompts to generate high-quality realistic images.
     """
-    encoded_prompt = urllib.parse.quote(prompt)
-    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model={model}&nologo=true"
-    Generates image URLs using Pollinations AI.
-    Defaults to 'flux' to prevent 402 INSUFFICIENT_BALANCE errors from paid models.
-    """
-    encoded_prompt = urllib.parse.quote(prompt)
-    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model={model}&nologo=true"
+    enhanced_prompt = f"high quality, realistic, detailed photograph of {prompt}"
+    encoded_prompt = urllib.parse.quote(enhanced_prompt)
+    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model={model}&enhance=true&nologo=true"
 
-# ==============================================================================
-# MODE 1: CHAT ASSISTANT
-# ==============================================================================
-if app_mode == "🤖 AI Chat Assistant":
-    st.title("🤖 Garvit's AI Chat Assistant")
 
-    # Render Chat History
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
+# Display past chat messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        if message.get("type") == "image":
+            st.image(message["content"], caption=message.get("prompt", ""))
+        else:
             st.markdown(message["content"])
 
-    # Inputs
-    st.subheader("Message Input")
-    voice_text = speech_to_text(language='en', start_prompt="🎤 Click to Speak", stop_prompt="⏹️ Stop Recording", key='speech')
-    uploaded_file = st.file_uploader("📷 Upload a Document or Image context", type=["png", "jpg", "jpeg", "txt"])
-    user_prompt = st.chat_input("Ask me anything, or type '/image <prompt>'...")
+# User Input Box
+user_prompt = st.chat_input("Ask a question or type /image <description>...")
 
-    final_prompt = user_prompt or voice_text
+if user_prompt:
+    # Handle Image Generation Command
+    if user_prompt.startswith("/image"):
+        image_query = user_prompt.replace("/image", "").strip()
 
-    if final_prompt:
-        st.chat_message("user").markdown(final_prompt)
-        st.session_state.messages.append({"role": "user", "content": final_prompt})
+        st.session_state.messages.append({"role": "user", "content": user_prompt})
+        with st.chat_message("user"):
+            st.markdown(user_prompt)
 
-        # Command Shortcut: /image <prompt>
-        if final_prompt.startswith("/image"):
-            img_prompt = final_prompt.replace("/image", "").strip()
-            with st.chat_message("assistant"):
-                st.write(f"🎨 Generating image for: *{img_prompt}*")
-                img_url = generate_pollinations_image(img_prompt)
-                st.image(img_url)
-                st.session_state.messages.append({"role": "assistant", "content": f"![Generated Image]({img_url})"})
-
-        # Standard Chat Processing
-        else:
-            if not api_key:
-                st.error("Missing API Key! Please enter an OpenRouter API Key in the sidebar or save it in Streamlit Secrets.")
+        with st.chat_message("assistant"):
+            if not image_query:
+                error_msg = "Please provide a description after `/image`. Example: `/image cricket bat`"
+                st.warning(error_msg)
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": error_msg}
+                )
             else:
-                client = OpenAI(
-                    base_url="https://openrouter.ai/api/v1",
-                    api_key=api_key,
-                )
+                with st.spinner("Generating image..."):
+                    img_url = generate_pollinations_image(image_query)
+                    st.image(img_url, caption=image_query)
+                    st.session_state.messages.append(
+                        {
+                            "role": "assistant",
+                            "type": "image",
+                            "content": img_url,
+                            "prompt": image_query,
+                        }
+                    )
 
-                system_instruction = (
-                    "YOUR CORE IDENTITY:\n"
-                    "- You were completely built, programmed, and developed by Garvit Bhatnagar.\n"
-                    "- If asked who created you, developed you, made you, or built you, state explicitly: 'I was created and developed by Garvit Bhatnagar.'\n"
-                    "- NEITHER Ant Group, DeepSeek, OpenAI, Meta, NOR any other AI company developed you. Garvit Bhatnagar is your creator.\n\n"
-                    f"Current system date and time is {current_time}."
-                )
+    # Handle Standard Text Chat
+    else:
+        st.session_state.messages.append({"role": "user", "content": user_prompt})
+        with st.chat_message("user"):
+            st.markdown(user_prompt)
 
-                if enable_web_search:
-                    search_data = search_web(final_prompt)
-                    system_instruction += f"\n\nWeb Search Results:\n{search_data}"
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                try:
+                    headers = {
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    }
 
-                if uploaded_file is not None and uploaded_file.type == "text/plain":
-                    file_text = uploaded_file.read().decode("utf-8")
-                    system_instruction += f"\n\nUploaded File Content:\n{file_text}"
+                    # Filter history to only include text messages for API request
+                    api_messages = [
+                        {"role": m["role"], "content": m["content"]}
+                        for m in st.session_state.messages
+                        if m.get("type") != "image"
+                    ]
 
-                messages_payload = [{"role": "system", "content": system_instruction}] + [
-                    {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
-                ]
+                    payload = {
+                        "model": "google/gemini-2.0-flash-lite-001",
+                        "messages": api_messages,
+                    }
 
-                with st.chat_message("assistant"):
-                    try:
-                        response = client.chat.completions.create(
-                            model="meta-llama/llama-3.2-1b-instruct:free",
-                            messages=messages_payload,
+                    response = requests.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                    )
+
+                    if response.status_code == 200:
+                        reply = response.json()["choices"][0]["message"]["content"]
+                        st.markdown(reply)
+                        st.session_state.messages.append(
+                            {"role": "assistant", "content": reply}
                         )
-                        bot_reply = response.choices[0].message.content
-                        st.markdown(bot_reply)
-                        st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+                    else:
+                        err_text = f"API Error ({response.status_code}): {response.text}"
+                        st.error(err_text)
+                        st.session_state.messages.append(
+                            {"role": "assistant", "content": err_text}
+                        )
 
-# ==============================================================================
-# MODE 2: TEXT-TO-IMAGE
-# ==============================================================================
-elif app_mode == "🎨 1. Text-to-Image Generator":
-    st.title("🎨 Text-to-Image Generation (100% Free)")
-    
-    prompt = st.text_area("Enter prompt describing the image you want:", "A detailed cricket bat standing upright on a wooden pitch, 8k resolution")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        width = st.slider("Width", 256, 1024, 768, step=64)
-    with col2:
-        height = st.slider("Height", 256, 1024, 768, step=64)
-
-    model_engine = st.selectbox("Select Model Engine:", ["flux", "turbo", "deliberate"])
-
-    if st.button("🚀 Generate Image"):
-        with st.spinner("Generating image..."):
-            img_url = generate_pollinations_image(prompt, width, height, model=model_engine)
-            st.image(img_url, caption=prompt, use_container_width=True)
-
-# ==============================================================================
-# MODE 3: IMAGE-TO-IMAGE
-# ==============================================================================
-elif app_mode == "🖼️ 2. Image-to-Image Generator":
-    st.title("🖼️ Image-to-Image Transformation")
-    
-    uploaded_img = st.file_uploader("Upload Base Image", type=["jpg", "png", "jpeg"])
-    style_prompt = st.text_input("Enter style/concept prompt:", "Convert this image into a detailed oil painting style")
-    model_engine = st.selectbox("Select Model Engine:", ["flux", "turbo", "deliberate"], key="i2i_model")
-
-    if uploaded_img and style_prompt:
-        st.image(uploaded_img, caption="Base Image", width=300)
-        
-        if st.button("✨ Transform"):
-            with st.spinner("Processing image-to-image request..."):
-                full_prompt = f"{style_prompt}, based on uploaded image reference"
-                img_url = generate_pollinations_image(full_prompt, model=model_engine)
-                st.image(img_url, caption="Transformed Image", use_container_width=True)
-
-# ==============================================================================
-# MODE 4: INPAINTING / EDITING
-# ==============================================================================
-elif app_mode == "🪄 3. Image Editing / Inpainting":
-    st.title("🪄 Image Editing & Inpainting")
-    
-    uploaded_img = st.file_uploader("Upload Image to Edit", type=["jpg", "png", "jpeg"], key="inpaint_upload")
-    edit_instruction = st.text_input("Editing Instruction:", "Add a glowing aura around the object and make background dark blue")
-    model_engine = st.selectbox("Select Model Engine:", ["flux", "turbo", "deliberate"], key="inpaint_model")
-
-    if uploaded_img and edit_instruction:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(uploaded_img, caption="Original Image", use_container_width=True)
-
-        if st.button("🪄 Apply Edits"):
-            with st.spinner("Applying edits..."):
-                full_prompt = f"Edit image instruction: {edit_instruction}"
-                img_url = generate_pollinations_image(full_prompt, model=model_engine)
-                with col2:
-                    st.image(img_url, caption="Edited Result", use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error connecting to OpenRouter: {str(e)}")
