@@ -1,3 +1,4 @@
+import random
 import urllib.parse
 import requests
 import streamlit as st
@@ -30,11 +31,12 @@ if "messages" not in st.session_state:
 
 def generate_pollinations_image(prompt, width=1024, height=1024, model="flux"):
     """
-    Automatically enhances short user prompts to generate high-quality realistic images.
+    Appends a random seed to generate a unique image on every run.
     """
+    seed = random.randint(1, 999999)
     enhanced_prompt = f"high quality, realistic, detailed photograph of {prompt}"
     encoded_prompt = urllib.parse.quote(enhanced_prompt)
-    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model={model}&enhance=true&nologo=true"
+    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model={model}&seed={seed}&enhance=true&nologo=true"
 
 
 # Display past chat messages
@@ -99,7 +101,7 @@ if user_prompt:
                     ]
 
                     payload = {
-                        "model": "google/gemini-2.5-flash",
+                        "model": "openrouter/free",
                         "messages": api_messages,
                     }
 
